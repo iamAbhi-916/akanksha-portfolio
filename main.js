@@ -258,6 +258,7 @@ function setSkin(name) {
   currentSkin = name;
   buildCharacter(SKINS[name]);
   showToast(SKINS[name].label);
+  showPeek(name);
 
   document.querySelectorAll('[data-skin]').forEach(el => {
     el.classList.toggle('active', el.dataset.skin === name);
@@ -288,10 +289,131 @@ function animate() {
   if (parts.armR) parts.armR.rotation.x = -Math.sin(t * 1.8) * 0.25;
   if (parts.hairPony) parts.hairPony.rotation.x = Math.sin(t * 1.8) * 0.2;
 
+  // Peek mirror — render the SAME character group from a second camera into the peek canvas
+  if (peekVisible && peekRenderer) {
+    // bump scale-in on peek char
+    peekChar.scale.lerp(new THREE.Vector3(1, 1, 1), 0.22);
+    peekChar.position.y = Math.sin(t * 1.8) * 0.08;
+    peekChar.rotation.y = t * 0.6;  // slow spin so all sides show
+    if (peekParts.armL) peekParts.armL.rotation.x = Math.sin(t * 1.8) * 0.25;
+    if (peekParts.armR) peekParts.armR.rotation.x = -Math.sin(t * 1.8) * 0.25;
+    if (peekParts.hairPony) peekParts.hairPony.rotation.x = Math.sin(t * 1.8) * 0.2;
+    peekRenderer.render(peekScene, peekCamera);
+  }
+
   controls.update();
   renderer.render(scene, camera);
 }
 animate();
+
+/* ===================== Peek mini-scene ===================== */
+const peekCanvas = document.getElementById('peekCanvas');
+const peekEl = document.getElementById('heroPeek');
+const peekTag = peekEl?.querySelector('.peek-tag');
+let peekRenderer, peekScene, peekCamera, peekChar, peekParts = {}, peekAccGroup, peekVisible = false;
+
+function initPeek() {
+  peekRenderer = new THREE.WebGLRenderer({ canvas: peekCanvas, antialias: false, alpha: true });
+  peekRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  peekRenderer.setSize(peekCanvas.clientWidth, peekCanvas.clientHeight, false);
+
+  peekScene = new THREE.Scene();
+  peekCamera = new THREE.PerspectiveCamera(35, 1, 0.1, 50);
+  peekCamera.position.set(0, 0.6, 6.5);
+  peekCamera.lookAt(0, 0.4, 0);
+
+  peekScene.add(new THREE.AmbientLight(0xffffff, 0.85));
+  const pSun = new THREE.DirectionalLight(0xffffff, 0.9);
+  pSun.position.set(3, 5, 5);
+  peekScene.add(pSun);
+
+  peekChar = new THREE.Group();
+  peekScene.add(peekChar);
+  peekAccGroup = new THREE.Group();
+  peekChar.add(peekAccGroup);
+}
+initPeek();
+
+function buildPeekCharacter(skin) {
+  for (const k in peekParts) peekChar.remove(peekParts[k]);
+  peekParts = {};
+  while (peekAccGroup.children.length) peekAccGroup.remove(peekAccGroup.children[0]);
+
+  peekParts.head = box(1, 1, 1, skin.skin); peekParts.head.position.set(0, 2.1, 0); peekChar.add(peekParts.head);
+  const eL = box(0.16, 0.16, 0.05, '#1a1a1a'); eL.position.set(-0.22, 2.18, 0.52);
+  const eR = box(0.16, 0.16, 0.05, '#1a1a1a'); eR.position.set(0.22, 2.18, 0.52);
+  const mo = box(0.32, 0.06, 0.05, '#7a2030'); mo.position.set(0, 1.92, 0.52);
+  peekParts.eyeL = eL; peekParts.eyeR = eR; peekParts.mouth = mo; peekChar.add(eL, eR, mo);
+
+  peekParts.hairTop = box(1.04, 0.18, 1.04, skin.hair); peekParts.hairTop.position.set(0, 2.65, 0);
+  peekParts.hairBack = box(1.04, 0.9, 0.18, skin.hair); peekParts.hairBack.position.set(0, 2.1, -0.5);
+  peekParts.hairPony = box(0.3, 0.9, 0.3, skin.hair); peekParts.hairPony.position.set(0, 1.7, -0.65);
+  peekChar.add(peekParts.hairTop, peekParts.hairBack, peekParts.hairPony);
+
+  peekParts.torso = box(1.05, 1.4, 0.6, skin.top); peekParts.torso.position.set(0, 0.95, 0); peekChar.add(peekParts.torso);
+  peekParts.accent = box(1.07, 0.2, 0.62, skin.topAccent); peekParts.accent.position.set(0, 1.45, 0); peekChar.add(peekParts.accent);
+
+  peekParts.armL = box(0.4, 1.4, 0.4, skin.top); peekParts.armL.position.set(-0.72, 0.95, 0);
+  peekParts.armR = box(0.4, 1.4, 0.4, skin.top); peekParts.armR.position.set(0.72, 0.95, 0);
+  peekChar.add(peekParts.armL, peekParts.armR);
+
+  peekParts.handL = box(0.4, 0.3, 0.4, skin.skin); peekParts.handL.position.set(-0.72, 0.15, 0);
+  peekParts.handR = box(0.4, 0.3, 0.4, skin.skin); peekParts.handR.position.set(0.72, 0.15, 0);
+  peekChar.add(peekParts.handL, peekParts.handR);
+
+  peekParts.legL = box(0.5, 1.3, 0.5, skin.bottom); peekParts.legL.position.set(-0.26, -0.4, 0);
+  peekParts.legR = box(0.5, 1.3, 0.5, skin.bottom); peekParts.legR.position.set(0.26, -0.4, 0);
+  peekChar.add(peekParts.legL, peekParts.legR);
+
+  peekParts.shoeL = box(0.52, 0.2, 0.7, skin.shoes); peekParts.shoeL.position.set(-0.26, -1.15, 0.1);
+  peekParts.shoeR = box(0.52, 0.2, 0.7, skin.shoes); peekParts.shoeR.position.set(0.26, -1.15, 0.1);
+  peekChar.add(peekParts.shoeL, peekParts.shoeR);
+
+  if (skin.accessory === 'cap') {
+    const cap = box(1.2, 0.1, 1.2, '#000'); cap.position.set(0, 2.78, 0);
+    const top2 = box(0.4, 0.2, 0.4, '#000'); top2.position.set(0, 2.93, 0);
+    const tassel = box(0.08, 0.5, 0.08, skin.topAccent); tassel.position.set(0.35, 2.7, 0);
+    peekAccGroup.add(cap, top2, tassel);
+  } else if (skin.accessory === 'briefcase') {
+    const cs = box(0.6, 0.5, 0.18, '#5b3a1a'); cs.position.set(0.95, 0, 0);
+    const h = box(0.35, 0.08, 0.06, '#2a1a08'); h.position.set(0.95, 0.32, 0);
+    peekAccGroup.add(cs, h);
+  } else if (skin.accessory === 'laptop') {
+    const base = box(0.7, 0.05, 0.55, '#c0c0c0'); base.position.set(0.95, 0.05, 0);
+    const lid = box(0.7, 0.5, 0.05, '#c0c0c0'); lid.position.set(0.95, 0.32, -0.25); lid.rotation.x = -0.2;
+    const scr = box(0.55, 0.4, 0.02, '#0a2d8f'); scr.position.set(0.95, 0.32, -0.22); scr.rotation.x = -0.2;
+    peekAccGroup.add(base, lid, scr);
+  } else if (skin.accessory === 'lipstick') {
+    const tube = box(0.16, 0.35, 0.16, '#d4577d'); tube.position.set(0.95, 0.25, 0);
+    const cap2 = box(0.18, 0.18, 0.18, '#3a1a25'); cap2.position.set(0.95, 0.55, 0);
+    const stick = box(0.1, 0.15, 0.1, '#a73355'); stick.position.set(0.95, 0.7, 0);
+    const heart = box(0.18, 0.18, 0.05, '#ff5577'); heart.position.set(-0.95, 1.5, 0.3);
+    peekAccGroup.add(tube, cap2, stick, heart);
+  }
+
+  // pop-in
+  peekChar.scale.set(0.01, 0.01, 0.01);
+}
+
+let peekHideTid;
+function showPeek(skinName) {
+  if (!peekEl) return;
+  // Don't show peek if hero is on screen
+  const hero = document.getElementById('hero');
+  const heroRect = hero.getBoundingClientRect();
+  const heroOnScreen = heroRect.bottom > 100;
+  if (heroOnScreen) return;
+
+  buildPeekCharacter(SKINS[skinName]);
+  if (peekTag) peekTag.textContent = SKINS[skinName].label.split('—')[0].trim();
+  peekVisible = true;
+  peekEl.classList.add('show');
+  clearTimeout(peekHideTid);
+  peekHideTid = setTimeout(() => {
+    peekEl.classList.remove('show');
+    setTimeout(() => { peekVisible = false; }, 400);
+  }, 3500);
+}
 
 function showToast(text) {
   let t = document.querySelector('.toast');
