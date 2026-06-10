@@ -140,6 +140,12 @@ button{font-family:inherit;cursor:pointer;border:none;}
   text-shadow:1px 1px 0 #000;
   box-shadow:0 0 0 3px #fff inset, 0 4px 0 rgba(0,0,0,.5);
 }
+.skin-pill.reset-pill{
+  font-size:14px;letter-spacing:0;padding:9px 12px;
+  margin-left:4px;background:#222;
+}
+.skin-pill.reset-pill:hover{background:#333;}
+.skin-pill.reset-pill.active{box-shadow:0 0 0 3px var(--gold) inset, 0 4px 0 rgba(0,0,0,.5);background:#222;color:var(--gold);}
 
 @media (max-width:960px){
   .hero-overlay{
